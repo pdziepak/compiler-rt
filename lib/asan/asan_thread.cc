@@ -154,13 +154,13 @@ void AsanThread::Init() {
   CHECK_EQ(this->stack_size(), 0U);
   SetThreadStackAndTls();
   CHECK_GT(this->stack_size(), 0U);
-  CHECK(AddrIsInMem(stack_bottom_));
-  CHECK(AddrIsInMem(stack_top_ - 1));
+  CHECK(AddrIsInMem(stack_bottom()));
+  CHECK(AddrIsInMem(stack_top() - 1));
   ClearShadowForThreadStackAndTLS();
   int local = 0;
   VReport(1, "T%d: stack [%p,%p) size 0x%zx; local=%p\n", tid(),
-          (void *)stack_bottom_, (void *)stack_top_, stack_top_ - stack_bottom_,
-          &local);
+          (void *)stack_bottom(), (void *)stack_top(),
+          stack_top() - stack_bottom(), &local);
 }
 
 thread_return_t AsanThread::ThreadStart(
@@ -195,9 +195,10 @@ thread_return_t AsanThread::ThreadStart(
 
 void AsanThread::SetThreadStackAndTls() {
   uptr tls_size = 0;
-  GetThreadStackAndTls(tid() == 0, &stack_bottom_, &stack_size_, &tls_begin_,
-                       &tls_size);
-  stack_top_ = stack_bottom_ + stack_size_;
+  GetThreadStackAndTls(tid() == 0, &current_stack_.stack_bottom,
+                       &current_stack_.stack_size, &tls_begin_, &tls_size);
+  current_stack_.stack_top = current_stack_.stack_bottom
+                             + current_stack_.stack_size;
   tls_end_ = tls_begin_ + tls_size;
   dtls_ = DTLS_Get();
 
@@ -206,7 +207,7 @@ void AsanThread::SetThreadStackAndTls() {
 }
 
 void AsanThread::ClearShadowForThreadStackAndTLS() {
-  PoisonShadow(stack_bottom_, stack_top_ - stack_bottom_, 0);
+  PoisonShadow(stack_bottom(), stack_top() - stack_bottom(), 0);
   if (tls_begin_ != tls_end_)
     PoisonShadow(tls_begin_, tls_end_ - tls_begin_, 0);
 }

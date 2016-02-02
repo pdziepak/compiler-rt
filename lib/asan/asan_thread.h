@@ -66,9 +66,15 @@ class AsanThread {
   thread_return_t ThreadStart(uptr os_id,
                               atomic_uintptr_t *signal_thread_is_registered);
 
-  uptr stack_top() { return stack_top_; }
-  uptr stack_bottom() { return stack_bottom_; }
-  uptr stack_size() { return stack_size_; }
+  struct StackDescriptor {
+    uptr stack_top;
+    uptr stack_bottom;
+    uptr stack_size;
+  };
+
+  uptr stack_top() { return CurrentStack()->stack_top; }
+  uptr stack_bottom() { return CurrentStack()->stack_bottom; }
+  uptr stack_size() { return CurrentStack()->stack_size; }
   uptr tls_begin() { return tls_begin_; }
   uptr tls_end() { return tls_end_; }
   DTLS *dtls() { return dtls_; }
@@ -83,8 +89,16 @@ class AsanThread {
   };
   bool GetStackFrameAccessByAddr(uptr addr, StackFrameAccess *access);
 
+  bool AddrIsInStack(StackDescriptor *stack, uptr addr) {
+    return addr >= stack->stack_bottom && addr < stack->stack_top;
+  }
+
+  StackDescriptor *CurrentStack() {
+    return &current_stack_;
+  }
+
   bool AddrIsInStack(uptr addr) {
-    return addr >= stack_bottom_ && addr < stack_top_;
+    return AddrIsInStack(CurrentStack(), addr);
   }
 
   void DeleteFakeStack(int tid) {
@@ -130,11 +144,9 @@ class AsanThread {
   AsanThreadContext *context_;
   thread_callback_t start_routine_;
   void *arg_;
-  uptr stack_top_;
-  uptr stack_bottom_;
   // stack_size_ == stack_top_ - stack_bottom_;
   // It needs to be set in a async-signal-safe manner.
-  uptr stack_size_;
+  StackDescriptor current_stack_;
   uptr tls_begin_;
   uptr tls_end_;
   DTLS *dtls_;
