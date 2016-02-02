@@ -82,6 +82,17 @@ class AsanThread {
   AsanThreadContext *context() { return context_; }
   void set_context(AsanThreadContext *context) { context_ = context; }
 
+  void SetUserStack(uptr base, uptr size) {
+    temp_stack_->stack_bottom = base;
+    temp_stack_->stack_top = base + size;
+    temp_stack_->stack_size = size;
+
+    StackDescriptor* oprev = previous_stack_;
+    previous_stack_ = next_stack_;
+    next_stack_ = temp_stack_;
+    temp_stack_ = oprev;
+  }
+
   struct StackFrameAccess {
     uptr offset;
     uptr frame_pc;
@@ -94,7 +105,12 @@ class AsanThread {
   }
 
   StackDescriptor *CurrentStack() {
-    return &current_stack_;
+    int local;
+    if (AddrIsInStack(previous_stack_, (uptr)&local)) {
+        return previous_stack_;
+    } else {
+        return next_stack_;
+    }
   }
 
   bool AddrIsInStack(uptr addr) {
@@ -144,9 +160,17 @@ class AsanThread {
   AsanThreadContext *context_;
   thread_callback_t start_routine_;
   void *arg_;
-  // stack_size_ == stack_top_ - stack_bottom_;
-  // It needs to be set in a async-signal-safe manner.
-  StackDescriptor current_stack_;
+
+  // We have three stack descriptors for async-safe stack change. New stack
+  // information is written to temp_stack_. Then previous_stack_ is made to
+  // point to the same descriptor that next_stack_ does. Finally, temp_stack_
+  // is assigned to next_stack_. The result is that at any time either
+  // previous_stack_ or next_stack_ contain the correct stack information.
+  StackDescriptor stacks_[3];
+  StackDescriptor* temp_stack_;
+  StackDescriptor* next_stack_;
+  StackDescriptor* previous_stack_;
+
   uptr tls_begin_;
   uptr tls_end_;
   DTLS *dtls_;
