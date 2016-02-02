@@ -1,8 +1,4 @@
-// We can't unwind stack if we're running coroutines on heap-allocated
-// memory. Make sure we don't report these leaks.
-
 // RUN: %clangxx_lsan %s -o %t
-// RUN: %run %t 2>&1
 // RUN: not %run %t foo 2>&1 | FileCheck %s
 
 #include <stdio.h>
