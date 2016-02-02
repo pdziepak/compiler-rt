@@ -17,9 +17,23 @@ ucontext_t child_context;
 
 const int kStackSize = 1 << 20;
 
+volatile int force_write;
+
 __attribute__((noinline))
 void Throw() {
+  char buf[1024];
+  for (int i = 0; i < 1024; i++) {
+    buf[i] = force_write;
+  }
   throw 1;
+}
+
+__attribute__((noinline))
+void Func() {
+  int buf[4 * 1024];
+  for (int i = 0; i < 4 * 1024; i++) {
+    buf[i] = force_write;
+  }
 }
 
 __attribute__((noinline))
@@ -27,6 +41,7 @@ void ThrowAndCatch() {
   try {
     Throw();
   } catch(int a) {
+    Func();
     printf("ThrowAndCatch: %d\n", a);
   }
 }
